@@ -60,13 +60,12 @@ with placeholder.container():
 pipe = RagPipeline()
 
 with st.expander("Pinecone Health (temporary)"):
-    st.write("Index name:", settings.pinecone_index_name)
+    st.write("Index:", settings.pinecone_index)
+    st.write("Region:", settings.pinecone_region)
+    st.write("Cloud:", settings.pinecone_cloud)
     try:
-        # cache once per session so we don't spam the API
-        if "pc_stats" not in st.session_state:
-            stats = pipe.retriever.index.describe_index_stats()
-            st.session_state["pc_stats"] = stats
-        st.json(st.session_state["pc_stats"])
+        stats = pipe.retriever.index.describe_index_stats()
+        st.json(stats)
     except Exception as e:
         st.error(f"Pinecone error while fetching stats: {e}")
 

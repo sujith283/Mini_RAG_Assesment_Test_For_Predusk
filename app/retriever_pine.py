@@ -1,76 +1,102 @@
 # app/retriever_pine.py
+from __future__ import annotations
+
 from typing import List, Dict, Any
-from app.config import settings
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
 
+from app.config import settings
+
+
+DIM = settings.embedding_dim  # 384 for MiniLM
+
+
 class PineconeRetriever:
     def __init__(self):
-        # 1) Connect
+        # --- Embeddings model ---
+        # Normalize embeddings to match cosine metric best practices.
+        self.embedder = SentenceTransformer(settings.embedding_model_name)
+
+        # --- Pinecone client ---
         self.pc = Pinecone(api_key=settings.pinecone_api_key)
 
-        # 2) Ensure index exists (serverless)
-        name = settings.pinecone_index_name
-        indexes = [i["name"] for i in self.pc.list_indexes().get("indexes", [])]
-        if name not in indexes:
+        # --- Ensure index exists (serverless) ---
+        name = settings.pinecone_index
+        existing = [i["name"] for i in self.pc.list_indexes().get("indexes", [])]
+        if name not in existing:
+            # Cloud/region come from your config (e.g., cloud="aws", region="us-east-1")
             self.pc.create_index(
                 name=name,
                 dimension=DIM,
                 metric="cosine",
-                spec=ServerlessSpec(cloud="aws", region=settings.pinecone_environment or "us-east-1"),
+                spec=ServerlessSpec(
+                    cloud=settings.pinecone_cloud,
+                    region=settings.pinecone_region or "us-east-1",
+                ),
             )
 
-        # 3) Open the index
+        # --- Open index handle ---
         self.index = self.pc.Index(name)
 
-    # ... your upsert/query methods ...
-
+    # -------- Embeddings --------
     def embed(self, texts: List[str]) -> List[List[float]]:
-        return self.embedder.encode(texts, normalize_embeddings=True).tolist()
+        vecs = self.embedder.encode(texts, normalize_embeddings=True)
+        return vecs.tolist() if hasattr(vecs, "tolist") else vecs
 
+    # -------- Upsert (chunks) --------
     def upsert_chunks(self, chunks: List[Dict[str, Any]], namespace: str | None = None):
         namespace = namespace or settings.pinecone_namespace
+
         vectors = []
         for i, c in enumerate(chunks):
-            vec = self.embed([c["text"]])[0]
+            # c: {"text": "...", "metadata": {"source": "...", "title": "...", "section": "...", "position": int}}
+            values = self.embed([c["text"]])[0]
+            md_in = c.get("metadata", {}) or {}
             metadata = {
                 "text": c["text"],
-                **{k: v for k, v in c["metadata"].items() if k in ("source", "title", "section", "position")}
+                # keep only the keys you care about (used later for citations)
+                **{k: v for k, v in md_in.items() if k in ("source", "title", "section", "position")}
             }
-            vectors.append({
-                "id": f'{metadata.get("source","doc")}:{metadata.get("position", i)}',
-                "values": vec,
-                "metadata": metadata
-            })
-        # Pinecone v3 upsert
-        self.index.upsert(vectors=vectors, namespace=namespace)
+            vid = f'{metadata.get("source", "doc")}:{metadata.get("position", i)}'
+            vectors.append({"id": vid, "values": values, "metadata": metadata})
 
-    def retrieve(self, query: str, top_k: int | None = None, namespace: str | None = None, min_score: float = 0.25):
+        # Pinecone v3 upsert
+        if vectors:
+            self.index.upsert(vectors=vectors, namespace=namespace)
+
+    # -------- Retrieve (vector search) --------
+    def retrieve(
+        self,
+        query: str,
+        top_k: int | None = None,
+        namespace: str | None = None,
+        min_score: float = 0.25,
+    ):
         top_k = top_k or settings.initial_recall_k
         namespace = namespace or settings.pinecone_namespace
+
         qvec = self.embed([query])[0]
         res = self.index.query(
             vector=qvec,
             top_k=top_k,
             include_metadata=True,
-            namespace=namespace
+            namespace=namespace,
         )
+
         hits = []
-        for m in res["matches"]:
-            if m["score"] >= min_score:   # <---- guard added
-                md = m["metadata"] or {}
-                hits.append({
-                    "id": m["id"],
-                    "score": m["score"],
-                    "text": md.get("text", ""),
-                    "metadata": md
-                })
+        # Pinecone v3 returns dict with "matches"
+        for m in res.get("matches", []):
+            score = m.get("score", 0.0)
+            if score >= min_score:
+                md = m.get("metadata") or {}
+                hits.append(
+                    {
+                        "id": m.get("id"),
+                        "score": score,
+                        "text": md.get("text", ""),
+                        "metadata": md,
+                    }
+                )
         return hits
-    
-    def embed(self, texts: List[str]) -> List[List[float]]:
-        vecs = self.embedder.encode(texts, normalize_embeddings=True)
-        # Accept either numpy array or plain Python list from mocks
-        if hasattr(vecs, "tolist"):
-            vecs = vecs.tolist()
-        return vecs
+
 
