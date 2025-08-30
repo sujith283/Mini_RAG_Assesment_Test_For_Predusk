@@ -26,7 +26,16 @@ def _extract_text_from_pdf(uploaded_file) -> str:
         except Exception:
             return ""
 
+import streamlit as st
 st.set_page_config(page_title="Mini RAG (Pinecone + MiniLM + Cohere Rerank + Groq)", layout="wide")
+
+# Debug panel – remove after fixing
+with st.expander("Diagnostics (temporary)"):
+    st.write(
+        "Secrets loaded:",
+        "PINECONE" in st.secrets,
+        "api_key" in st.secrets.get("PINECONE", {})
+    )
 
 # --- Centered loading message until pipeline is ready ---
 placeholder = st.empty()
