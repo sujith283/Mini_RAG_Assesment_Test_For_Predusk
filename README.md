@@ -33,6 +33,10 @@ rag-pinecone/
 
 ## ⚙️ Setup & Installation
 
+Prerequisites
+
+Python 3.11+ (minimum required version)
+
 ### 1. Clone the repository
 
 ```bash
@@ -166,6 +170,7 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 - [Cohere Rerank](https://docs.cohere.com/reference/rerank)
 - [Groq API](https://console.groq.com/docs/quickstart)
 - [Streamlit](https://docs.streamlit.io/)
+
 
 
 
