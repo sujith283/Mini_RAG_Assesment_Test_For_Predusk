@@ -119,10 +119,3 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 - [Groq API](https://console.groq.com/docs/quickstart)
 - [Streamlit](https://docs.streamlit.io/)
 
-## 📄 License
-
-[Add your license here]
-
-## 🤝 Contributing
-
-[Add contribution guidelines here]
