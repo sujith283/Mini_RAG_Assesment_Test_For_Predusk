@@ -2,7 +2,6 @@
 import streamlit as st
 from app import token_tracker
 from app.pipeline import RagPipeline
-from app.config import settings
 
 # -------- Helpers --------
 def _extract_text_from_pdf(uploaded_file) -> str:
@@ -21,7 +20,6 @@ def _extract_text_from_pdf(uploaded_file) -> str:
                 texts.append("")
         return "\n\n".join(texts).strip()
     except Exception:
-        # Fallback: avoid hard failure
         try:
             data = uploaded_file.getvalue()
             return data.decode(errors="ignore")
@@ -30,17 +28,9 @@ def _extract_text_from_pdf(uploaded_file) -> str:
 
 # ---------------- Page config ----------------
 st.set_page_config(
-    page_title="Mini RAG (Pinecone + MiniLM + Cohere Rerank + Groq)",
+    page_title="MINI_RAG — Pinecone + MiniLM + Cohere + Groq",
     layout="wide",
 )
-
-# ---------------- Diagnostics (temporary; safe booleans only) ----------------
-with st.expander("Diagnostics (temporary)"):
-    st.write(
-        "Secrets loaded:",
-        "PINECONE" in st.secrets,
-        "api_key" in st.secrets.get("PINECONE", {})
-    )
 
 # ---------------- Centered loading message until pipeline is ready ----------------
 placeholder = st.empty()
@@ -50,45 +40,31 @@ with placeholder.container():
         unsafe_allow_html=True
     )
 
-# ---------------- Instantiate pipeline (may take a few seconds) ----------------
+# ---------------- Instantiate pipeline ----------------
 pipe = RagPipeline()
 
-# ---------------- Pinecone Health (temporary) ----------------
-with st.expander("Pinecone Health (temporary)"):
-    st.write("Index:", settings.pinecone_index)
-    st.write("Region:", settings.pinecone_region)
-    st.write("Cloud:", settings.pinecone_cloud)
-    try:
-        stats_raw = pipe.retriever.index.describe_index_stats()
-        # Coerce to a plain dict for Streamlit's JSON renderer
-        if hasattr(stats_raw, "to_dict"):
-            stats = stats_raw.to_dict()
-        elif isinstance(stats_raw, dict):
-            stats = stats_raw
-        else:
-            import json
-            stats = json.loads(json.dumps(stats_raw, default=str))
-        st.json(stats)
-    except Exception as e:
-        st.error(f"Pinecone error while fetching stats: {e}")
-
-# ---------------- Clear loading placeholder ----------------
+# ---------------- Clear loading ----------------
 placeholder.empty()
 
-# ---------------- UI starts after pipeline is ready ----------------
-st.title("🤖 MINI_RAG Chatbot — Pinecone + MiniLM + Cohere Rerank-3 + Groq")
+# ---------------- Header ----------------
+st.markdown(
+    "<div style='display:flex;align-items:center;gap:10px'>"
+    "<h2 style='margin:0;'>🤖 MINI_RAG Chatbot</h2>"
+    "<span style='opacity:0.7'>Pinecone · MiniLM · Cohere Rerank · Groq</span>"
+    "</div>",
+    unsafe_allow_html=True,
+)
 
-# ---------------- Sidebar: Ingestion ----------------
+# ---------------- Sidebar: Ingestion & Options ----------------
 with st.sidebar:
     st.header("📥 Ingest")
     pdf_file = st.file_uploader("Upload a PDF", type=["pdf"])
     text_to_index = st.text_area(
         "Or paste text to index",
-        height=180,
+        height=160,
         placeholder="Paste raw text here…"
     )
 
-    # Only enable ingest if we have either a PDF file or pasted text
     can_ingest = (pdf_file is not None) or (text_to_index.strip() != "")
     ingest_btn = st.button(
         "Ingest",
@@ -98,7 +74,7 @@ with st.sidebar:
     )
 
     if ingest_btn:
-        # If PDF provided, extract and ingest with filename as source
+        # PDF
         if pdf_file is not None:
             with st.spinner("Reading PDF and chunking…"):
                 pdf_text = _extract_text_from_pdf(pdf_file)
@@ -109,7 +85,7 @@ with st.sidebar:
             else:
                 st.error("Could not extract any text from the PDF. Please check the file.")
 
-        # If pasted text provided, ingest it as local-paste
+        # Pasted text
         if text_to_index.strip():
             pipe.ingest_document(
                 text_to_index.strip(),
@@ -122,53 +98,69 @@ with st.sidebar:
         if not (pdf_file is not None or text_to_index.strip()):
             st.warning("Upload a PDF or paste some text to ingest.")
 
-# ---------------- Main: Chat Interface ----------------
+    st.divider()
+    st.subheader("⚙️ Options")
+    auto_expand_sources = st.checkbox("Auto-expand Sources", value=True)
+    auto_expand_metrics = st.checkbox("Auto-expand Metrics", value=False)
+    st.caption("Tip: keep Sources open while verifying grounding.")
+
+# ---------------- Chat state ----------------
 if "chat_history" not in st.session_state:
-    # list of dicts: {"query": str, "answer": str, "out": dict}
+    # each: {"query": str, "answer": str, "out": dict}
     st.session_state.chat_history = []
 
-# Show previous chat turns
+# Clear chat
+cols = st.columns([1, 1, 6])
+with cols[0]:
+    if st.button("🧹 Clear Chat", use_container_width=True):
+        st.session_state.chat_history = []
+        st.experimental_rerun()
+
+# ---------------- Chat log ----------------
 for i, turn in enumerate(st.session_state.chat_history):
     with st.chat_message("user"):
         st.write(turn["query"])
     with st.chat_message("assistant"):
-        st.markdown("### Answer")
         st.write(turn["answer"])
 
-        # --- Metrics panel for that turn ---
-        m = turn["out"].get("metrics", {})
-        tok = m.get("llm_tokens") or {}
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("LLM latency", f"{m.get('llm_latency_s', 0):.2f}s")
-        col2.metric("Retrieve", f"{m.get('retrieve_s', 0):.2f}s")
-        col3.metric("Rerank", f"{m.get('rerank_s', 0):.2f}s")
-        col4.metric("Model", m.get("model", "—"))
+        # Sources expander
+        src_open = auto_expand_sources
+        with st.expander("📚 Sources", expanded=src_open):
+            if turn["out"].get("sources"):
+                for s in turn["out"]["sources"]:
+                    st.markdown(f"**[{s['n']}] {s.get('title') or s.get('source')}**")
+                    small = f"{s.get('source','')} • {s.get('section','')} • pos {s.get('position')}"
+                    st.caption(small)
+                    st.code(s["snippet"])
+            else:
+                st.caption("No sources returned.")
 
-        # Update token tracker if total available
-        total_used = tok.get("total_tokens")
-        if total_used:
-            left, used, limit = token_tracker.add_tokens(int(total_used))
-            col5.metric("Tokens left (today)", f"{left:,}", f"-{used:,}/{limit:,}")
-            st.caption(
-                f"Tokens — Prompt: {tok.get('prompt_tokens','?')}, "
-                f"Completion: {tok.get('completion_tokens','?')}, "
-                f"Total: {tok.get('total_tokens','?')}"
-            )
-        else:
-            col5.metric("Tokens left (today)", "—")
-            st.caption("Tokens — not returned by provider for this response.")
+        # Metrics expander
+        met_open = auto_expand_metrics
+        with st.expander("📈 Metrics", expanded=met_open):
+            m = turn["out"].get("metrics", {}) or {}
+            tok = m.get("llm_tokens") or {}
+            col1, col2, col3, col4, col5 = st.columns(5)
+            col1.metric("LLM latency", f"{m.get('llm_latency_s', 0):.2f}s")
+            col2.metric("Retrieve", f"{m.get('retrieve_s', 0):.2f}s")
+            col3.metric("Rerank", f"{m.get('rerank_s', 0):.2f}s")
+            col4.metric("Model", m.get("model", "—"))
 
-        # Sources
-        if turn["out"]["sources"]:
-            st.markdown("### Sources")
-            for s in turn["out"]["sources"]:
-                st.markdown(f"**[{s['n']}] {s.get('title') or s.get('source')}**")
-                small = f"{s.get('source','')} • {s.get('section','')} • pos {s.get('position')}"
-                st.caption(small)
-                st.code(s["snippet"])
+            total_used = tok.get("total_tokens")
+            if total_used:
+                left, used, limit = token_tracker.add_tokens(int(total_used))
+                col5.metric("Tokens left (today)", f"{left:,}", f"-{used:,}/{limit:,}")
+                st.caption(
+                    f"Tokens — Prompt: {tok.get('prompt_tokens','?')}, "
+                    f"Completion: {tok.get('completion_tokens','?')}, "
+                    f"Total: {tok.get('total_tokens','?')}"
+                )
+            else:
+                col5.metric("Tokens left (today)", "—")
+                st.caption("Tokens — not returned by provider for this response.")
 
-# --- New Question Input ---
-q = st.chat_input("Ask your question here…")
+# ---------------- New message ----------------
+q = st.chat_input("Ask your question…")
 if q and q.strip():
     with st.chat_message("user"):
         st.write(q)
@@ -177,41 +169,45 @@ if q and q.strip():
         with st.spinner("Thinking..."):
             out = pipe.answer(q)
 
-        st.markdown("### Answer")
         st.write(out["answer"])
 
-        # --- Metrics panel ---
-        m = out.get("metrics", {})
-        tok = m.get("llm_tokens") or {}
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("LLM latency", f"{m.get('llm_latency_s', 0):.2f}s")
-        col2.metric("Retrieve", f"{m.get('retrieve_s', 0):.2f}s")
-        col3.metric("Rerank", f"{m.get('rerank_s', 0):.2f}s")
-        col4.metric("Model", m.get("model", "—"))
+        # Sources expander
+        src_open = auto_expand_sources
+        with st.expander("📚 Sources", expanded=src_open):
+            if out.get("sources"):
+                for s in out["sources"]:
+                    st.markdown(f"**[{s['n']}] {s.get('title') or s.get('source')}**")
+                    small = f"{s.get('source','')} • {s.get('section','')} • pos {s.get('position')}"
+                    st.caption(small)
+                    st.code(s["snippet"])
+            else:
+                st.caption("No sources returned.")
 
-        total_used = tok.get("total_tokens")
-        if total_used:
-            left, used, limit = token_tracker.add_tokens(int(total_used))
-            col5.metric("Tokens left (today)", f"{left:,}", f"-{used:,}/{limit:,}")
-            st.caption(
-                f"Tokens — Prompt: {tok.get('prompt_tokens','?')}, "
-                f"Completion: {tok.get('completion_tokens','?')}, "
-                f"Total: {tok.get('total_tokens','?')}"
-            )
-        else:
-            col5.metric("Tokens left (today)", "—")
-            st.caption("Tokens — not returned by provider for this response.")
+        # Metrics expander
+        met_open = auto_expand_metrics
+        with st.expander("📈 Metrics", expanded=met_open):
+            m = out.get("metrics", {}) or {}
+            tok = m.get("llm_tokens") or {}
+            col1, col2, col3, col4, col5 = st.columns(5)
+            col1.metric("LLM latency", f"{m.get('llm_latency_s', 0):.2f}s")
+            col2.metric("Retrieve", f"{m.get('retrieve_s', 0):.2f}s")
+            col3.metric("Rerank", f"{m.get('rerank_s', 0):.2f}s")
+            col4.metric("Model", m.get("model", "—"))
 
-        # Sources
-        if out["sources"]:
-            st.markdown("### Sources")
-            for s in out["sources"]:
-                st.markdown(f"**[{s['n']}] {s.get('title') or s.get('source')}**")
-                small = f"{s.get('source','')} • {s.get('section','')} • pos {s.get('position')}"
-                st.caption(small)
-                st.code(s["snippet"])
+            total_used = tok.get("total_tokens")
+            if total_used:
+                left, used, limit = token_tracker.add_tokens(int(total_used))
+                col5.metric("Tokens left (today)", f"{left:,}", f"-{used:,}/{limit:,}")
+                st.caption(
+                    f"Tokens — Prompt: {tok.get('prompt_tokens','?')}, "
+                    f"Completion: {tok.get('completion_tokens','?')}, "
+                    f"Total: {tok.get('total_tokens','?')}"
+                )
+            else:
+                col5.metric("Tokens left (today)", "—")
+                st.caption("Tokens — not returned by provider for this response.")
 
-    # Save this turn into chat history
+    # persist
     st.session_state.chat_history.append(
         {"query": q, "answer": out["answer"], "out": out}
     )
