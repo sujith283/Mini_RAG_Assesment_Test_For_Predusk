@@ -110,6 +110,7 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 - Groq API free tier has request/token rate limits — check your account
 - Cohere rerank credits may be limited
 - PyPDF2 PDF extraction is basic; replace with pdfplumber for better results
+- Add custom namespace for each user in Pinecone
 - Demo project — add auth & persistence for production use
 
 ## 🔗 API Documentation
@@ -118,4 +119,5 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 - [Cohere Rerank](https://docs.cohere.com/reference/rerank)
 - [Groq API](https://console.groq.com/docs/quickstart)
 - [Streamlit](https://docs.streamlit.io/)
+
 
