@@ -15,6 +15,8 @@ class Settings:
     pinecone_cloud: str = os.getenv("PINECONE_CLOUD", "aws")
     pinecone_region: str = os.getenv("PINECONE_REGION", "us-east-1")
     pinecone_namespace: str = os.getenv("PINECONE_NAMESPACE", "default")
+    min_score: float = 0.25
+
 
     # Embeddings (MiniLM)
     embedding_model_name: str = os.getenv("EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")

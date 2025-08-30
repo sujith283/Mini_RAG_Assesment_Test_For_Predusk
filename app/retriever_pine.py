@@ -38,7 +38,7 @@ class PineconeRetriever:
         # Pinecone v3 upsert
         self.index.upsert(vectors=vectors, namespace=namespace)
 
-    def retrieve(self, query: str, top_k: int | None = None, namespace: str | None = None) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int | None = None, namespace: str | None = None, min_score: float = 0.25):
         top_k = top_k or settings.initial_recall_k
         namespace = namespace or settings.pinecone_namespace
         qvec = self.embed([query])[0]
@@ -50,11 +50,13 @@ class PineconeRetriever:
         )
         hits = []
         for m in res["matches"]:
-            md = m["metadata"] or {}
-            hits.append({
-                "id": m["id"],
-                "score": m["score"],
-                "text": md.get("text", ""),
-                "metadata": md
-            })
+            if m["score"] >= min_score:   # <---- guard added
+                md = m["metadata"] or {}
+                hits.append({
+                    "id": m["id"],
+                    "score": m["score"],
+                    "text": md.get("text", ""),
+                    "metadata": md
+                })
         return hits
+
