@@ -1,5 +1,5 @@
 # app/llm.py
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from app.config import settings
 from groq import Groq
 import time
@@ -21,12 +21,12 @@ class GroqLLM:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return chat.choices[0].message.content.strip()
+        return (chat.choices[0].message.content or "").strip()
 
     def generate_with_meta(
         self, messages: List[Dict[str, str]], temperature: float = 0.2, max_tokens: int = 600
     ) -> Dict[str, Any]:
-        """Return text + usage + latency (seconds)."""
+        """Return text + usage + latency (seconds); handles dict or pydantic usage objects."""
         t0 = time.time()
         chat = self.client.chat.completions.create(
             model=self.model,
@@ -37,16 +37,21 @@ class GroqLLM:
         latency = time.time() - t0
         text = (chat.choices[0].message.content or "").strip()
 
-        # Defensive usage extraction
-        usage = getattr(chat, "usage", None)
-        if usage is None and hasattr(chat, "to_dict"):
-            usage = chat.to_dict().get("usage")
-        usage = usage or {}
-        # Normalize keys if present
+        usage_raw = getattr(chat, "usage", None)
+
+        # Normalize usage to a dict (works for dicts and Pydantic objects)
+        def _get(attr, default=None):
+            if usage_raw is None:
+                return default
+            if isinstance(usage_raw, dict):
+                return usage_raw.get(attr, default)
+            # Pydantic object or similar
+            return getattr(usage_raw, attr, default)
+
         usage_norm = {
-            "prompt_tokens": usage.get("prompt_tokens"),
-            "completion_tokens": usage.get("completion_tokens"),
-            "total_tokens": usage.get("total_tokens"),
+            "prompt_tokens": _get("prompt_tokens"),
+            "completion_tokens": _get("completion_tokens"),
+            "total_tokens": _get("total_tokens"),
         }
 
         return {
@@ -55,4 +60,3 @@ class GroqLLM:
             "usage": usage_norm,
             "model": self.model,
         }
-

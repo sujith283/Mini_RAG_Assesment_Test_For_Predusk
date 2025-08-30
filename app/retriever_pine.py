@@ -59,4 +59,11 @@ class PineconeRetriever:
                     "metadata": md
                 })
         return hits
+    
+    def embed(self, texts: List[str]) -> List[List[float]]:
+        vecs = self.embedder.encode(texts, normalize_embeddings=True)
+        # Accept either numpy array or plain Python list from mocks
+        if hasattr(vecs, "tolist"):
+            vecs = vecs.tolist()
+        return vecs
 

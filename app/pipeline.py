@@ -17,34 +17,52 @@ class RagPipeline:
     # ... keep ingest_document as-is ...
 
     def retrieve_and_rerank(self, query: str) -> Dict[str, Any]:
-        t0 = time.time()
-        initial_hits = self.retriever.retrieve(query, top_k=settings.initial_recall_k)
-        t_retrieve = time.time() - t0
+        """Always returns a dict: {'hits': [...], 'timings': {'retrieve_s': float, 'rerank_s': float}, 'rerank_used': bool}"""
+        t_retrieve = 0.0
+        t_rerank = 0.0
+        try:
+            t0 = time.time()
+            # Dense retrieval
+            initial_hits = self.retriever.retrieve(query, top_k=settings.initial_recall_k)
+            t_retrieve = time.time() - t0
 
-        if not initial_hits:
-            return {"hits": [], "timings": {"retrieve_s": t_retrieve, "rerank_s": 0.0}}
+            if not initial_hits:
+                return {"hits": [], "timings": {"retrieve_s": t_retrieve, "rerank_s": 0.0}, "rerank_used": False}
 
-        # MMR diversify
-        embs = self.retriever.embed([h["text"] for h in initial_hits])
-        mmr_idx = mmr(embs, top_k=min(12, len(initial_hits)), lambda_mult=0.55)
-        diversified = [initial_hits[i] for i in mmr_idx]
+            # MMR diversify (optional)
+            embs = self.retriever.embed([h["text"] for h in initial_hits])
+            from app.utils import mmr
+            mmr_idx = mmr(embs, top_k=min(12, len(initial_hits)), lambda_mult=0.55)
+            diversified = [initial_hits[i] for i in mmr_idx]
 
-        # Cohere rerank
-        t1 = time.time()
-        rr = self.cohere.rerank(
-            model=self.rerank_model,
-            query=query,
-            documents=[d["text"] for d in diversified],
-            top_n=min(settings.rerank_top_k, len(diversified)),
-        )
-        t_rerank = time.time() - t1
+            # Cohere rerank
+            try:
+                t1 = time.time()
+                rr = self.cohere.rerank(
+                    model=self.rerank_model,
+                    query=query,
+                    documents=[d["text"] for d in diversified],
+                    top_n=min(settings.rerank_top_k, len(diversified)),
+                )
+                t_rerank = time.time() - t1
 
-        reranked = []
-        for r in rr.results:
-            item = diversified[r.index]
-            reranked.append({**item, "rerank_score": r.relevance_score})
+                reranked = []
+                for r in rr.results:
+                    item = diversified[r.index]
+                    reranked.append({**item, "rerank_score": r.relevance_score})
+                return {"hits": reranked, "timings": {"retrieve_s": t_retrieve, "rerank_s": t_rerank}, "rerank_used": True}
+            except Exception as e:
+                # Fallback to dense retrieval if rerank fails
+                print(f"[WARN] Cohere rerank failed, using dense retrieval only: {e}")
+                reranked = diversified[: min(settings.rerank_top_k, len(diversified))]
+                return {"hits": reranked, "timings": {"retrieve_s": t_retrieve, "rerank_s": 0.0}, "rerank_used": False}
 
-        return {"hits": reranked, "timings": {"retrieve_s": t_retrieve, "rerank_s": t_rerank}}
+        except Exception as e:
+            # Any unexpected failure -> safe empty result
+            print(f"[ERROR] retrieve_and_rerank crashed: {e}")
+            return {"hits": [], "timings": {"retrieve_s": t_retrieve, "rerank_s": t_rerank}, "rerank_used": False}
+
+
 
     def answer(self, query: str) -> Dict[str, Any]:
         # Retrieve + rerank with timings
@@ -99,9 +117,19 @@ class RagPipeline:
             },
         ]
 
-        # LLM call with meta
-        llm_res = self.llm.generate_with_meta(messages)
-        final_answer = clean_text(llm_res["text"])
+        # LLM call with meta 
+        if hasattr(self.llm, "generate_with_meta"):
+            llm_res = self.llm.generate_with_meta(messages)
+            final_answer = clean_text(llm_res["text"])
+            model_name = llm_res.get("model", settings.groq_model)
+            latency_s = llm_res.get("latency_s", 0.0)
+            usage = llm_res.get("usage")
+        else:
+            t0 = time.time()
+            final_answer = clean_text(self.llm.generate(messages))
+            latency_s = time.time() - t0
+            model_name = settings.groq_model
+            usage = None
 
         display_sources = []
         for c in contexts:
@@ -117,14 +145,27 @@ class RagPipeline:
         display_sources.sort(key=lambda x: x["n"])
 
         return {
-            "answer": final_answer,
-            "contexts": contexts,
-            "sources": display_sources,
-            "metrics": {
-                "retrieve_s": timings["retrieve_s"],
-                "rerank_s": timings["rerank_s"],
-                "llm_latency_s": llm_res["latency_s"],
-                "llm_tokens": llm_res["usage"],   # prompt/completion/total if available
-                "model": llm_res["model"],
-            },
-        }
+        "answer": final_answer,
+        "contexts": contexts,
+        "sources": display_sources,
+        "metrics": {
+            "retrieve_s": timings["retrieve_s"],
+            "rerank_s": timings["rerank_s"],
+            "llm_latency_s": latency_s,
+            "llm_tokens": usage,
+            "model": model_name,
+            "rerank_used": rr.get("rerank_used", False),  # <-- add this
+        },
+    }
+    
+    def ingest_document(self, text: str, source: str, title: str = "", section: str = ""):
+        from app.utils import sliding_window_chunk
+        from app.config import settings
+        chunks = sliding_window_chunk(
+            text=text,
+            chunk_size_tokens=settings.chunk_size_tokens,
+            overlap_ratio=settings.chunk_overlap,
+            meta={"source": source, "title": title, "section": section},
+        )
+        self.retriever.upsert_chunks(chunks)
+
