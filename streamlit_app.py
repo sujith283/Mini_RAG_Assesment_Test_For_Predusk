@@ -114,7 +114,7 @@ cols = st.columns([1, 1, 6])
 with cols[0]:
     if st.button("🧹 Clear Chat", use_container_width=True):
         st.session_state.chat_history = []
-        st.experimental_rerun()
+        st.rerun()
 
 # ---------------- Chat log ----------------
 for i, turn in enumerate(st.session_state.chat_history):
