@@ -6,17 +6,24 @@ from pinecone import Pinecone, ServerlessSpec
 
 class PineconeRetriever:
     def __init__(self):
-        self.embedder = SentenceTransformer(settings.embedding_model_name)
+        # 1) Connect
         self.pc = Pinecone(api_key=settings.pinecone_api_key)
-        # Create index if missing
-        if settings.pinecone_index not in [i.name for i in self.pc.list_indexes()]:
+
+        # 2) Ensure index exists (serverless)
+        name = settings.pinecone_index_name
+        indexes = [i["name"] for i in self.pc.list_indexes().get("indexes", [])]
+        if name not in indexes:
             self.pc.create_index(
-                name=settings.pinecone_index,
-                dimension=settings.embedding_dim,
+                name=name,
+                dimension=DIM,
                 metric="cosine",
-                spec=ServerlessSpec(cloud=settings.pinecone_cloud, region=settings.pinecone_region),
+                spec=ServerlessSpec(cloud="aws", region=settings.pinecone_environment or "us-east-1"),
             )
-        self.index = self.pc.Index(settings.pinecone_index)
+
+        # 3) Open the index
+        self.index = self.pc.Index(name)
+
+    # ... your upsert/query methods ...
 
     def embed(self, texts: List[str]) -> List[List[float]]:
         return self.embedder.encode(texts, normalize_embeddings=True).tolist()
