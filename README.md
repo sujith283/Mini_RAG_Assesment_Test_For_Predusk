@@ -4,7 +4,7 @@ A lightweight Retrieval-Augmented Generation (RAG) demo app. Upload PDFs or past
 
 ## 🌐 Live Demo
 
-**Try it now:** [https://ie2taanqdmqsswbtqvavb3.streamlit.app](https://ie2taanqdmqsswbtqvavb3.streamlit.app)
+**Try it now:** [https://your-app-url.streamlit.app](https://your-app-url.streamlit.app)
 
 > The app is already deployed and ready to use! No setup required for basic testing.
 
@@ -33,28 +33,75 @@ rag-pinecone/
 
 ## ⚙️ Setup & Installation
 
-### 1. Clone
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/rag-pinecone.git
-cd rag-pinecone
+git clone https://github.com/sujith283/Mini_RAG_Assesment_Test_For_Predusk
+cd Mini_RAG_Assesment_Test_For_Predusk
 ```
 
-### 2. Install dependencies
+### 2. Create and activate virtual environment
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+```
+
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure API Keys ⚠️ **Very Important**
+### 4. Configure API Keys ⚠️ **Very Important**
 
 All secrets are loaded from `.streamlit/secrets.toml`. This file is **not checked into Git** (already gitignored).
 
-**Steps to create it:**
+**Create the secrets file using terminal commands:**
 
-1. In the root of your repo, create a folder named `.streamlit` (if not already there)
+```bash
+# Create .streamlit directory
+mkdir -p .streamlit
+
+# Create secrets.toml file (choose one method below)
+
+# Method 1: Using echo (Windows Command Prompt)
+echo [PINECONE] > .streamlit\secrets.toml
+echo api_key = "your-pinecone-key" >> .streamlit\secrets.toml
+echo environment = "your-pinecone-environment" >> .streamlit\secrets.toml
+echo index_name = "mini-rag" >> .streamlit\secrets.toml
+echo. >> .streamlit\secrets.toml
+echo [COHERE] >> .streamlit\secrets.toml
+echo api_key = "your-cohere-key" >> .streamlit\secrets.toml
+echo. >> .streamlit\secrets.toml
+echo [GROQ] >> .streamlit\secrets.toml
+echo api_key = "your-groq-key" >> .streamlit\secrets.toml
+
+# Method 2: Using cat (macOS/Linux)
+cat > .streamlit/secrets.toml << 'EOF'
+[PINECONE]
+api_key = "your-pinecone-key"
+environment = "your-pinecone-environment"
+index_name = "mini-rag"
+
+[COHERE]
+api_key = "your-cohere-key"
+
+[GROQ]
+api_key = "your-groq-key"
+EOF
+```
+
+**Or create manually:**
+1. Create a folder named `.streamlit` (if not already there)
 2. Inside `.streamlit`, create a file named `secrets.toml`
-3. Paste the following template into it and fill in your real keys:
+3. Paste the following template and fill in your real keys:
 
 ```toml
 [PINECONE]
@@ -69,11 +116,9 @@ api_key = "your-cohere-key"
 api_key = "your-groq-key"
 ```
 
-4. Save the file
-
 > ⚠️ **Do not commit this file to GitHub** — it contains private keys. Streamlit Cloud will automatically read this file if you upload it under **"Secrets"** in the project settings.
 
-### 4. Run
+### 5. Run the application
 
 ```bash
 streamlit run streamlit_app.py
@@ -98,7 +143,7 @@ streamlit run streamlit_app.py
 
 ### Live Demo
 The app is already deployed on **Streamlit Cloud** and accessible at:
-**[https://ie2taanqdmqsswbtqvavb3.streamlit.app](https://ie2taanqdmqsswbtqvavb3.streamlit.app/)**
+**[https://your-app-url.streamlit.app](https://your-app-url.streamlit.app)**
 
 ### Deploy Your Own Version
 - **Streamlit Cloud** (recommended): Upload repo, then paste your secrets in the "Secrets" settings panel
@@ -109,8 +154,8 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 
 - Groq API free tier has request/token rate limits — check your account
 - Cohere rerank credits may be limited
+- add custom namespace for each user
 - PyPDF2 PDF extraction is basic; replace with pdfplumber for better results
-- Add custom namespace for each user in Pinecone
 - Demo project — add auth & persistence for production use
 
 ## 🔗 API Documentation
