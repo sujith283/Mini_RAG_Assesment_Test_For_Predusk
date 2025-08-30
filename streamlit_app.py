@@ -1,6 +1,7 @@
 import streamlit as st
 from app import token_tracker
 from app.pipeline import RagPipeline
+from app.config import settings
 
 # -------- Helpers --------
 def _extract_text_from_pdf(uploaded_file) -> str:
