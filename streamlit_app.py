@@ -36,6 +36,16 @@ with st.expander("Diagnostics (temporary)"):
         "PINECONE" in st.secrets,
         "api_key" in st.secrets.get("PINECONE", {})
     )
+with st.expander("Pinecone Health (temporary)"):
+    st.write("Index name:", settings.pinecone_index_name)
+    try:
+        stats = st.session_state.get("pc_stats")
+        if not stats:
+            stats = pipe.retriever.index.describe_index_stats()
+            st.session_state["pc_stats"] = stats
+        st.json(stats)
+    except Exception as e:
+        st.error(f"Pinecone error: {e}")
 
 # --- Centered loading message until pipeline is ready ---
 placeholder = st.empty()
