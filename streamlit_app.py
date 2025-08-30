@@ -30,23 +30,35 @@ def _extract_text_from_pdf(uploaded_file) -> str:
 import streamlit as st
 st.set_page_config(page_title="Mini RAG (Pinecone + MiniLM + Cohere Rerank + Groq)", layout="wide")
 
-# Debug panel – remove after fixing
+# Diagnostics – keep while debugging
 with st.expander("Diagnostics (temporary)"):
     st.write(
         "Secrets loaded:",
         "PINECONE" in st.secrets,
         "api_key" in st.secrets.get("PINECONE", {})
     )
+
+# Centered loading message until pipeline is ready
+placeholder = st.empty()
+with placeholder.container():
+    st.markdown("<h2 style='text-align:center;'>⏳ Loading… please wait</h2>", unsafe_allow_html=True)
+
+# Instantiate pipeline (may take a few seconds)
+pipe = RagPipeline()
+
+# Optional Pinecone health – now AFTER pipeline exists, and using correct setting names
 with st.expander("Pinecone Health (temporary)"):
-    st.write("Index name:", settings.pinecone_index_name)
+    st.write("Index:", settings.pinecone_index)
+    st.write("Region:", settings.pinecone_region)
+    st.write("Cloud:", settings.pinecone_cloud)
     try:
-        stats = st.session_state.get("pc_stats")
-        if not stats:
-            stats = pipe.retriever.index.describe_index_stats()
-            st.session_state["pc_stats"] = stats
+        stats = pipe.retriever.index.describe_index_stats()
         st.json(stats)
     except Exception as e:
-        st.error(f"Pinecone error: {e}")
+        st.error(f"Pinecone error while fetching stats: {e}")
+
+# Clear loading placeholder
+placeholder.empty()
 
 # --- Centered loading message until pipeline is ready ---
 placeholder = st.empty()
