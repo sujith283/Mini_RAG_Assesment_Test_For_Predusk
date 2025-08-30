@@ -72,16 +72,18 @@ mkdir -p .streamlit
 # Create secrets.toml file (choose one method below)
 
 # Method 1: Using echo (Windows Command Prompt)
-echo [PINECONE] > .streamlit\secrets.toml
-echo api_key = "your-pinecone-key" >> .streamlit\secrets.toml
-echo environment = "your-pinecone-environment" >> .streamlit\secrets.toml
-echo index_name = "mini-rag" >> .streamlit\secrets.toml
-echo. >> .streamlit\secrets.toml
-echo [COHERE] >> .streamlit\secrets.toml
-echo api_key = "your-cohere-key" >> .streamlit\secrets.toml
-echo. >> .streamlit\secrets.toml
-echo [GROQ] >> .streamlit\secrets.toml
-echo api_key = "your-groq-key" >> .streamlit\secrets.toml
+Set-Content -Path ".streamlit\secrets.toml" -Value "[PINECONE]"
+Add-Content -Path ".streamlit\secrets.toml" -Value 'api_key = "your-pinecone-key"'
+Add-Content -Path ".streamlit\secrets.toml" -Value 'environment = "your-pinecone-environment"'
+Add-Content -Path ".streamlit\secrets.toml" -Value 'index_name = "mini-rag"'
+Add-Content -Path ".streamlit\secrets.toml" -Value ""
+
+Add-Content -Path ".streamlit\secrets.toml" -Value "[COHERE]"
+Add-Content -Path ".streamlit\secrets.toml" -Value 'api_key = "your-cohere-key"'
+Add-Content -Path ".streamlit\secrets.toml" -Value ""
+
+Add-Content -Path ".streamlit\secrets.toml" -Value "[GROQ]"
+Add-Content -Path ".streamlit\secrets.toml" -Value 'api_key = "your-groq-key"'
 
 # Method 2: Using cat (macOS/Linux)
 cat > .streamlit/secrets.toml << 'EOF'
@@ -164,5 +166,6 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 - [Cohere Rerank](https://docs.cohere.com/reference/rerank)
 - [Groq API](https://console.groq.com/docs/quickstart)
 - [Streamlit](https://docs.streamlit.io/)
+
 
 
