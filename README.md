@@ -4,7 +4,7 @@ A lightweight Retrieval-Augmented Generation (RAG) demo app. Upload PDFs or past
 
 ## 🌐 Live Demo
 
-**Try it now:** [https://your-app-url.streamlit.app](https://your-app-url.streamlit.app)
+**Try it now:** [ie2taanqdmqsswbtqvavb3.streamlit.app](https://ie2taanqdmqsswbtqvavb3.streamlit.app)
 
 > The app is already deployed and ready to use! No setup required for basic testing.
 
@@ -149,7 +149,7 @@ streamlit run streamlit_app.py
 
 ### Live Demo
 The app is already deployed on **Streamlit Cloud** and accessible at:
-**[https://your-app-url.streamlit.app](https://your-app-url.streamlit.app)**
+**[ie2taanqdmqsswbtqvavb3.streamlit.app](https://ie2taanqdmqsswbtqvavb3.streamlit.app)**
 
 ### Deploy Your Own Version
 - **Streamlit Cloud** (recommended): Upload repo, then paste your secrets in the "Secrets" settings panel
@@ -170,6 +170,7 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 - [Cohere Rerank](https://docs.cohere.com/reference/rerank)
 - [Groq API](https://console.groq.com/docs/quickstart)
 - [Streamlit](https://docs.streamlit.io/)
+
 
 
 
