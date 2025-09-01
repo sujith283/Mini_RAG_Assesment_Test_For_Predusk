@@ -1,5 +1,7 @@
 # MINI_RAG — Pinecone + MiniLM + Cohere Rerank + Groq + Streamlit
 
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
 A lightweight Retrieval-Augmented Generation (RAG) demo app. Upload PDFs or paste text, ask natural language queries, and get grounded answers with citations, reranking, and usage metrics.
 
 ## 🌐 Live Demo
@@ -170,6 +172,7 @@ The app is already deployed on **Streamlit Cloud** and accessible at:
 - [Cohere Rerank](https://docs.cohere.com/reference/rerank)
 - [Groq API](https://console.groq.com/docs/quickstart)
 - [Streamlit](https://docs.streamlit.io/)
+
 
 
 
